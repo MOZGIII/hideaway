@@ -34,9 +34,24 @@ class IRCServer
     @users = {}
     @clients = []
     @channels = {}
+	@db = nil
     
     @debug = true
     @running = false
+	@logging = false
+  end
+
+  def set_db_logging db
+	@db = db
+	@logging = true
+  end
+
+  def get_db
+	@db
+  end
+
+  def is_db_logging
+	@logging
   end
 
   def log msg

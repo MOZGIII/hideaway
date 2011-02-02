@@ -57,8 +57,15 @@ end
 ServerConfig.load 'rbircd.conf'
 
 # Daemons.daemonize
-
 server = IRCServer.new ServerConfig.server_name
+
+# Are we db logging?
+if ServerConfig.mongodb_logging
+	require 'rubygems'
+	require 'mongo'
+	db = Mongo::Connection.new(ServerConfig.mongodb_host).db(ServerConfig.mongodb_dbname)
+	server.set_db_logging db
+end
 
 EventMachine::run do
 	ServerConfig.listens.each do |listener|

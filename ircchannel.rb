@@ -71,9 +71,20 @@ class IRCChannel
 	
 	def message(sender, message)
 		send_to_all_except sender, sender.path, :privmsg, @name, message
+		server = sender.server
+		if server and server.is_db_logging
+			doc = {:channel => @name, :nick => sender.nick, :message => message, :sent_at => Time.new, :type => 'privmsg', :sent_at_timestamp => Time.new.to_i}
+			db = server.get_db.collection(@name.gsub(/\#/, '')).insert(doc)
+		end
 	end
+
 	def notice(sender, message)
 		send_to_all_except sender, sender.path, :notice, @name, message
+		server = sender.server
+		if server and server.is_db_logging
+			doc = {:channel => @name, :nick => sender.nick, :message => message, :sent_at => Time.new, :type => 'notice', :sent_at_timestamp => Time.new.to_i}
+			db = server.get_db.collection(@name.gsub(/\#/, '')).insert(doc)
+		end
 	end
 	
 	def join client
@@ -107,6 +118,11 @@ class IRCChannel
 		@topic_timestamp = Time.now
 		@topic_author = author.nick
 		send_to_all author, :topic, @name, topic
+		server = author.server
+		if server and server.is_db_logging
+			doc = {:channel => @name, :nick => @topic_author, :message => topic, :sent_at => @topic_timestamp, :type => 'topic', :sent_at_timestamp => @topic_timestamp.to_i}
+			db = server.get_db.collection(@name.gsub(/\#/, '')).insert(doc)
+		end
 	end
 	
 	def has_mode? mode

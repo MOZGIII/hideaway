@@ -32,6 +32,11 @@ listens:
 # Modes that will be applied to new channels.
 default-chan-modes: ns
 
+# If we're going to log our channel messages to mongodb
+mongodb-logging: false
+mongodb-host: localhost
+mongodb-dbname: rbircd
+
 # The MOTD. For more info on this, see doc/motd.txt
 #motd-file: rbIRCd.motd
 motd-program: echo "Hi, %n!" | cowsay; echo "\nTHIS! IS! SPARTA!\nrbIRCd by danopia"

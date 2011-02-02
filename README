@@ -34,3 +34,9 @@ Soon to be done:
 - Check for chanop etc. before accepting modes, topics
 - INVITE
 - AWAY
+
+Logging to MongoDB
+
+All messages, notices and topic changes can be logged to MongoDB. It creates a collection
+for each channel, along with timestamp, nick, channel, etc. Use the parameters in the 
+config file to enable this feature.
