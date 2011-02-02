@@ -37,6 +37,7 @@ class IRCClient < LineConnection
     @server.clients << self
 		
 		@nick = '*'
+		@pass = ''
 		@umodes = ''
 		
 		@protocols = []
@@ -60,7 +61,7 @@ class IRCClient < LineConnection
   end
 
 
-  attr_reader :nick, :ident, :realname, :conn, :addr, :ip, :host, :dead, :umodes, :server
+  attr_reader :nick, :ident, :realname, :conn, :addr, :ip, :host, :dead, :umodes, :server, :pass
   attr_accessor :opered, :away, :created_at, :modified_at
 
 	def is_registered?
@@ -294,7 +295,7 @@ class IRCClient < LineConnection
 		command = args.shift.downcase
 		@server.log_nick @nick, command
 		
-		if !is_registered? && !['user', 'nick', 'quit', 'pong'].include?(command)
+		if !is_registered? && !['user', 'pass', 'nick', 'quit', 'pong'].include?(command)
 			send_numeric 451, command.upcase, 'You have not registered'
 			return
 		end
@@ -309,6 +310,19 @@ class IRCClient < LineConnection
 				else
 					@ident = args[0]
 					@realname = args[3]
+					check_registration
+				end
+
+			when 'pass'
+				if args.empty? || args[0].size < 1
+					send_numeric 461, 'PASS', 'Not enough parameters'
+				elsif is_registered?
+					send_numeric 462, 'You may not reregister'
+				else
+					#Throw this in a variable for now, since
+					#PASS comes before USER. We'll check it's
+					#validity after USER comes through.
+					@pass = args[0]
 					check_registration
 				end
 		

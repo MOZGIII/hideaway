@@ -32,10 +32,18 @@ listens:
 # Modes that will be applied to new channels.
 default-chan-modes: ns
 
-# If we're going to log our channel messages to mongodb
-mongodb-logging: false
+# If we're going to use mongodb
+mongodb: false
 mongodb-host: localhost
 mongodb-dbname: rbircd
+
+# If we're going to log our channel messages to mongodb
+# Collectoins are per channel...
+mongodb-logging: false
+
+# If we're going to require logins
+mongodb-users-req-login: false
+users-collection: users
 
 # The MOTD. For more info on this, see doc/motd.txt
 #motd-file: rbIRCd.motd

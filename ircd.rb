@@ -60,11 +60,13 @@ ServerConfig.load 'rbircd.conf'
 server = IRCServer.new ServerConfig.server_name
 
 # Are we db logging?
-if ServerConfig.mongodb_logging
+if ServerConfig.mongodb
 	require 'rubygems'
 	require 'mongo'
 	db = Mongo::Connection.new(ServerConfig.mongodb_host).db(ServerConfig.mongodb_dbname)
-	server.set_db_logging db
+	server.set_db db
+	server.set_db_logging ServerConfig.mongodb_logging
+	server.set_require_login ServerConfig.mongodb_users_req_login
 end
 
 EventMachine::run do
