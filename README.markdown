@@ -56,11 +56,12 @@ start it up.
 
 ## TODO ##
 
-* <strike>Crypt passwords</strike>
-* Add allowed channels for users
+* Crypt passwords *(done)*
+* Add allowed channels for users *(done)*
 * Ability to spit back logs to people who were offline
 * Add the concept of groups for permissions
-* Setup Rakefile for common tasks and maintenance
+* Setup Rakefile for common tasks and maintenance (add users, groups,
+  etc.)
 * Ping timeouts
 * Join channel list
 * Modes
