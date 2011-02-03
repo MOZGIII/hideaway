@@ -87,8 +87,8 @@ class IRCChannel
 		end
 	end
 	
-	def join client
-		@ops << client if empty?
+	def join client, allow_auto_op=true
+		@ops << client if empty? and allow_auto_op
 		@users << client
 		send_to_all client.path, :join, @name
 	end
