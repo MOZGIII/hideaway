@@ -94,7 +94,7 @@ class IRCClient < LineConnection
 	def check_authentication
 		db = @server.get_db
 		if db
-			user = db.collection('users').find_one('username' => @ident)
+			user = get_db_user
 			if user
 				if user['password'] == @pass
 					@anonymous = false
@@ -112,6 +112,15 @@ class IRCClient < LineConnection
 			return true
 		end
 		false
+	end
+
+	def get_db_user 
+		user = nil
+		db = @server.get_db
+		if db
+			user = db.collection('users').find_one('username' => @ident)
+		end
+		user
 	end
  
 	def close reason='Client quit'
@@ -233,12 +242,27 @@ class IRCClient < LineConnection
 			send_numeric 422, 'MOTD File is missing'
 		end
 	end
+
+	def has_access_to? channel_name
+		user = get_db_user
+		if user
+			if user['allow_channels']
+				if user['allow_channels'].include?('*')
+					return true
+				end
+				return user['allow_channels'].include?(channel_name)
+			end
+		end
+		false
+	end
 	
 	def join target
 		channel = @server.find_channel target
 		
 		if !@server.validate_chan(target)
 			send_numeric 432, target, 'No such channel'
+		elsif !has_access_to?(target)
+			send_numeric 474, target, 'No access to this channel'
 		elsif channels.size >= ServerConfig.max_channels_per_user.to_i
 			send_numeric 405, target, 'You have joined too many channels'
 		elsif channel && channel.has_mode?('i')
@@ -325,10 +349,10 @@ class IRCClient < LineConnection
 		end
 	end
 	
-  def receive_line line
+	def receive_line line
 		puts line if @server.debug
-  	@modified_at = Time.now
-  	
+		@modified_at = Time.now
+
 		# Parse as per the RFC
 		raw_parts = line.chomp.split ' :', 2
 		args = raw_parts.shift.split ' '

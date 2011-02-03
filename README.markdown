@@ -40,12 +40,13 @@ Now go into the mongo shell and do the following:
 	connecting to: test
 	> use rbircd
 	switched to db rbircd
-	> db.users.insert({username: "test", password: "5bf1fd927dfb8679496a2e6cf00cbe50c1c87145"})
+	> db.users.insert({username: "test", password: "5bf1fd927dfb8679496a2e6cf00cbe50c1c87145", allow_channels: ['*']})
 
 If you now look, you'll see the user is created:
 
 	> db.users.find()
-	{ "_id" : ObjectId("4d4a91d1595c4e3b7721d196"), "username" : "test", "password" : "5bf1fd927dfb8679496a2e6cf00cbe50c1c87145" }
+	{ "_id" : ObjectId("4d4a91d1595c4e3b7721d196"), "username" : "test",
+		"allow_channels" : [ "*" ], "password" : "5bf1fd927dfb8679496a2e6cf00cbe50c1c87145" }
 	
 *(We'll setup a rake task to add/remove users and other settings in the
 future)*
@@ -58,6 +59,7 @@ start it up.
 * <strike>Crypt passwords</strike>
 * Add allowed channels for users
 * Ability to spit back logs to people who were offline
+* Add the concept of groups for permissions
 * Setup Rakefile for common tasks and maintenance
 * Ping timeouts
 * Join channel list
