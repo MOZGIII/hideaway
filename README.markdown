@@ -23,6 +23,7 @@ Hideaway requires the following gems:
 * eventmachine
 * daemons
 * mongo
+* json
 
 Users are stored in the users collection in mongodb. The passwords are
 simply a sha1 hashed string. The easiest way to hash it is to use:

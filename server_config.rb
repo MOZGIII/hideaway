@@ -1,6 +1,7 @@
 #!/usr/bin/env ruby
 
-# Copyright (c) 2009 Daniel Danopia
+# Copyright (c) 2011 Ted Kulp
+# Original rbircd - (c) 2009 Daniel Danopia
 # All rights reserved.
 # 
 # Redistribution and use in source and binary forms, with or without
@@ -27,45 +28,17 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-require 'rubygems'
 require 'yaml'
-require 'daemons'
-require 'eventmachine'
-require 'server_config.rb'
 
-def reload!
-	load 'ircserver.rb'
-	load 'ircchannel.rb'
-	load 'ircclient.rb'
-	load 'lineconnection.rb'
-end
-reload!
-
-# Load the config
-ServerConfig.load 'rbircd.conf'
-
-# Daemons.daemonize
-server = IRCServer.new ServerConfig.server_name
-
-# Are we db logging?
-if ServerConfig.mongodb
-	require 'mongo'
-	db = Mongo::Connection.new(ServerConfig.mongodb_host).db(ServerConfig.mongodb_dbname)
-	server.set_db db
-	server.set_db_logging ServerConfig.mongodb_logging
-	server.set_require_login ServerConfig.mongodb_users_req_login
-end
-
-EventMachine::run do
-	ServerConfig.listens.each do |listener|
-		EventMachine::start_server listener['interface'], listener['port'].to_i, IRCClient, server
+class ServerConfig
+	def self.load filename
+		@yaml = YAML.load File.open(filename)
 	end
 	
-	EventMachine::add_periodic_timer 60 do
-		server.clients.each do |conn|
-			conn.send nil, :ping, server.name
-		end
+	# Shorter way to access data
+	def self.method_missing m, *args, &blck
+		super unless @yaml.has_key?(m.to_s.gsub('_', '-'))
+		raise ArgumentError, "wrong number of arguments (#{args.length} for 0)" if args.any?
+		@yaml[m.to_s.gsub('_', '-')]
 	end
-	
-	puts "Ready."
 end
