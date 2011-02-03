@@ -19,12 +19,38 @@ Hideaway requires the following gems:
 * daemons
 * mongo
 
+Users are stored in the users collection in mongodb. The passwords are
+simply a sha1 hashed string. The easiest way to hash it is to use:
+
+	echo -n "blah" | shasum
+
+Which will produce:
+
+	5bf1fd927dfb8679496a2e6cf00cbe50c1c87145
+
+Now go into the mongo shell and do the following:
+
+	$ mongo
+	MongoDB shell version: 1.6.5
+	connecting to: test
+	> use rbircd
+	switched to db rbircd
+	> db.users.insert({username: "test", password: "5bf1fd927dfb8679496a2e6cf00cbe50c1c87145"})
+
+If you now look, you'll see the user is created:
+
+	> db.users.find()
+	{ "_id" : ObjectId("4d4a91d1595c4e3b7721d196"), "username" : "test", "password" : "5bf1fd927dfb8679496a2e6cf00cbe50c1c87145" }
+	
+*(We'll setup a rake task to add/remove users and other settings in the
+future)*
+
 Copy rbircd.conf.dist to rbircd.conf and modify to taste. Run ircd.rb to
 start it up.
 
 ## TODO ##
 
-* Crypt passwords
+* <strike>Crypt passwords</strike>
 * Add allowed channels for users
 * Ability to spit back logs to people who were offline
 * Ping timeouts

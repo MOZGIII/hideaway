@@ -26,6 +26,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 require 'lineconnection'
+require 'digest/sha1'
 
 class IRCClient < LineConnection
   attr_accessor :server
@@ -81,6 +82,8 @@ class IRCClient < LineConnection
 		end
 		send_welcome_flood
 		change_umode '+iwx'
+		# If they're anonymous, put them into any preconfigured
+		# channels
 		if is_anonymous?
 			ServerConfig.anonymous_channels.each do |chan_name|
 				join chan_name
@@ -361,7 +364,7 @@ class IRCClient < LineConnection
 					#Throw this in a variable for now, since
 					#PASS comes before USER. We'll check it's
 					#validity after USER comes through.
-					@pass = args[0]
+					@pass = Digest::SHA1.hexdigest(args[0])
 				end
 		
 			when 'nick'
