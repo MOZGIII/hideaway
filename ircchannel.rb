@@ -107,6 +107,7 @@ class IRCChannel
 		[@users, @owners, @protecteds, @ops, @halfops, @voices].each do |list|
 			list.delete client
 		end
+		client.update_part_record @name
 	end
 	
 	def empty?

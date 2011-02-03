@@ -122,6 +122,22 @@ class IRCClient < LineConnection
 		end
 		user
 	end
+
+	def update_part_record channel_name
+		unless is_anonymous?
+			db = @server.get_db
+			if db
+				user = db.collection('users').find_one('username' => @ident)
+				if user
+					unless user['last_part']
+						user['last_part'] = Hash.new
+					end
+					user['last_part'][channel_name] = Time.now.to_i
+					db.collection('users').update({"_id" => user["_id"]}, user)
+				end
+			end
+		end
+	end
  
 	def close reason='Client quit'
 		@server.log_nick @nick, "User disconnected (#{reason})."
@@ -135,6 +151,7 @@ class IRCClient < LineConnection
 				updated_users << user
 			end
 			channel.users.delete self
+			update_part_record channel.name
 		end
 		@dead = true
 		
