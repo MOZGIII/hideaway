@@ -37,7 +37,10 @@ class IRCClient < LineConnection
     @server.clients << self
 		
 		@nick = '*'
+		@pass = ''
 		@umodes = ''
+		@ident = ''
+		@anonymous = true
 		
 		@protocols = []
 		@watch = []
@@ -60,16 +63,52 @@ class IRCClient < LineConnection
   end
 
 
-  attr_reader :nick, :ident, :realname, :conn, :addr, :ip, :host, :dead, :umodes, :server
+  attr_reader :nick, :ident, :realname, :conn, :addr, :ip, :host, :dead, :umodes, :server, :pass, :anonymous
   attr_accessor :opered, :away, :created_at, :modified_at
 
 	def is_registered?
-		@nick != '*' && @ident
+		@nick != '*' && @ident != ''
 	end
+
+	def is_anonymous?
+		@anonymous
+	end
+
 	def check_registration
 		return unless is_registered?
+		if !check_authentication
+			close 'Invalid USER/PASS combination'
+		end
 		send_welcome_flood
 		change_umode '+iwx'
+		if is_anonymous?
+			ServerConfig.anonymous_channels.each do |chan_name|
+				join chan_name
+			end
+		end
+	end
+
+	def check_authentication
+		db = @server.get_db
+		if db
+			user = db.collection('users').find_one('username' => @ident)
+			if user
+				if user['password'] == @pass
+					@anonymous = false
+					return true
+				end
+			# Make sure no one stomps on a registered username
+			elsif ServerConfig.allow_anonymous_users
+				return true
+			end
+		# No db?  There are no non-anoymous users, then
+		# Won't make much diff, they won't have privileges
+		# to stomp on anyway, since there will be no data or
+		# registered users.
+		elsif ServerConfig.allow_anonymous_users
+			return true
+		end
+		false
 	end
  
 	def close reason='Client quit'
@@ -204,7 +243,8 @@ class IRCClient < LineConnection
 		else
 			channel ||= @server.find_or_create_channel(target)
 			return channel if channel.users.include?(self)
-			channel.join self
+			# Anonymous user can't be op... empty room or not
+			channel.join self, !is_anonymous?
 			send_topic channel
 			send_names channel
 		end
@@ -294,7 +334,7 @@ class IRCClient < LineConnection
 		command = args.shift.downcase
 		@server.log_nick @nick, command
 		
-		if !is_registered? && !['user', 'nick', 'quit', 'pong'].include?(command)
+		if !is_registered? && !['user', 'pass', 'nick', 'quit', 'pong'].include?(command)
 			send_numeric 451, command.upcase, 'You have not registered'
 			return
 		end
@@ -310,6 +350,18 @@ class IRCClient < LineConnection
 					@ident = args[0]
 					@realname = args[3]
 					check_registration
+				end
+
+			when 'pass'
+				if args.empty? || args[0].size < 1
+					send_numeric 461, 'PASS', 'Not enough parameters'
+				elsif is_registered?
+					send_numeric 462, 'You may not reregister'
+				else
+					#Throw this in a variable for now, since
+					#PASS comes before USER. We'll check it's
+					#validity after USER comes through.
+					@pass = args[0]
 				end
 		
 			when 'nick'
