@@ -114,7 +114,7 @@ class IRCClient < LineConnection
 		false
 	end
 
-	def get_db_user 
+	def get_db_user
 		user = nil
 		db = @server.get_db
 		if db
@@ -138,7 +138,7 @@ class IRCClient < LineConnection
 			end
 		end
 	end
- 
+
 	def close reason='Client quit'
 		@server.log_nick @nick, "User disconnected (#{reason})."
 		return if @dead
@@ -291,7 +291,36 @@ class IRCClient < LineConnection
 			channel.join self, !is_anonymous?
 			send_topic channel
 			send_names channel
+			if !is_anonymous?
+				send_backlog channel
+			end
 		end
+	end
+
+	def send_backlog channel
+		last_part = get_last_part channel
+		unless last_part.nil?
+			# Ok, we have when they parted -- now let's blast out the
+			# log for that channel
+			db = @server.get_db
+			if db
+				db.collection('channel-' + channel.name).find({'ident' => {'$ne' => @ident}, 'timestamp' => {'$gte' => last_part}}).sort([['timestamp', 'ascending']]).each do |row|
+					if row['type'] == 'privmsg'
+						send "#{row['nick']}!#{row['ident']}@#{@host}", :privmsg, channel.name, Time.at(row['timestamp']).strftime('%T') + "> " + row['message']
+					end
+				end
+			end
+		end
+	end
+
+	def get_last_part channel
+		user = get_db_user
+		if user
+			if user['last_part'] and user['last_part'][channel.name]
+				return user['last_part'][channel.name]
+			end
+		end
+		nil
 	end
 	
 	def send_topic channel, detailed=false

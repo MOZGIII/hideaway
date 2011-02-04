@@ -59,10 +59,10 @@ start it up.
 
 * Crypt passwords *(done)*
 * Add allowed channels for users *(done)*
-* Ability to spit back logs to people who were offline
+* Ability to spit back logs to people who were offline *(done)*
 * Add the concept of groups for permissions
 * Setup Rakefile for common tasks and maintenance (add users, groups,
-  etc.)
+  etc.) *(done)*
 * Ping timeouts
 * Join channel list
 * Modes
