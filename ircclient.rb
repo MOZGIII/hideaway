@@ -36,25 +36,27 @@ class IRCClient < LineConnection
 
     @server = server
     @server.clients << self
+
+	set_comm_inactivity_timeout 60
 		
-		@nick = '*'
-		@pass = ''
-		@umodes = ''
-		@ident = ''
-		@anonymous = true
-		
-		@protocols = []
-		@watch = []
-		@silence = []
-		
-		@created_at = Time.now
-		@modified_at = Time.now
-		
-		@port, @ip = Socket.unpack_sockaddr_in get_peername
-		@host = @ip
-		
-		send @server.name, :notice, 'AUTH', '*** Looking up your hostname...'
-		send @server.name, :notice, 'AUTH', '*** Found your hostname'
+	@nick = '*'
+	@pass = ''
+	@umodes = ''
+	@ident = ''
+	@anonymous = true
+	
+	@protocols = []
+	@watch = []
+	@silence = []
+	
+	@created_at = Time.now
+	@modified_at = Time.now
+	
+	@port, @ip = Socket.unpack_sockaddr_in get_peername
+	@host = @ip
+	
+	send @server.name, :notice, 'AUTH', '*** Looking up your hostname...'
+	send @server.name, :notice, 'AUTH', '*** Found your hostname'
   end
 
   def unbind
