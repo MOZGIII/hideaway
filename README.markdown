@@ -63,7 +63,12 @@ start it up.
 * Add the concept of groups for permissions
 * Setup Rakefile for common tasks and maintenance (add users, groups,
   etc.) *(done)*
-* Ping timeouts
+* Ping timeouts *(done? -- needs testing)*
+* Web based configuration tool
+	* Sinatra?
+	* Rails?
+	* PHP?
+* Allow ability to auto-join channels on connect
 * Join channel list
 * Modes
 * Code needs to be split up across files
