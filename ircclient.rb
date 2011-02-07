@@ -263,12 +263,13 @@ class IRCClient < LineConnection
 	end
 
 	def has_access_to? channel_name
+		# If it's in the anon list, then it's automatically true
+		return true if ServerConfig.anonymous_channels.include?(channel_name)
+
 		user = get_db_user
 		if user
 			if user['allow_channels']
-				if user['allow_channels'].include?('*')
-					return true
-				end
+				return true if user['allow_channels'].include?('*')
 				return user['allow_channels'].include?(channel_name)
 			end
 		end
