@@ -50,7 +50,10 @@ server = IRCServer.new ServerConfig.server_name
 # Are we db logging?
 if ServerConfig.mongodb
 	require 'mongo'
-	db = Mongo::Connection.new(ServerConfig.mongodb_host).db(ServerConfig.mongodb_dbname)
+	db = Mongo::Connection.new(ServerConfig.mongodb_host, ServerConfig.mongodb_port).db(ServerConfig.mongodb_dbname)
+	if ServerConfig.has_key?('mongodb-username') and ServerConfig.has_key?('mongodb_password')
+		db.authenticate(ServerConfig.mongodb_username, ServerConfig.mongodb_password)
+	end
 	server.set_db db
 	server.set_db_logging ServerConfig.mongodb_logging
 	server.set_require_login ServerConfig.mongodb_users_req_login

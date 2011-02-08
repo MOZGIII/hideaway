@@ -35,7 +35,10 @@ default-chan-modes: ns
 # If we're going to use mongodb
 mongodb: false
 mongodb-host: localhost
+mongodb-port: 27017
 mongodb-dbname: rbircd
+# mongodb-username: username
+# mongodb-password: password
 
 # If we're going to log our channel messages to mongodb
 # Collectoins are per channel...

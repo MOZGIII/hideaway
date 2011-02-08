@@ -34,6 +34,10 @@ class ServerConfig
 	def self.load filename
 		@yaml = YAML.load File.open(filename)
 	end
+
+	def self.has_key? key
+		@yaml.has_key?(key) || @yaml.has_key?(key.gsub('_', '-'))
+	end
 	
 	# Shorter way to access data
 	def self.method_missing m, *args, &blck
