@@ -13,7 +13,7 @@ namespace :user do
 
 		username = args[:username] || ''
 
-		db = Mongo::Connection.new(ServerConfig.mongodb_host).db(ServerConfig.mongodb_dbname)
+		db = get_db
 		if db
 			user = db.collection('users').find_one('username' => username)
 			if user
@@ -34,7 +34,7 @@ namespace :user do
 		if username.empty? or password.empty?
 			puts "username and password are required"
 		else
-			db = Mongo::Connection.new(ServerConfig.mongodb_host).db(ServerConfig.mongodb_dbname)
+			db = get_db
 			if db
 				user = db.collection('users').find_one('username' => username)
 				if user
@@ -50,4 +50,15 @@ namespace :user do
 			end
 		end
 	end
+end
+
+def get_db
+	db = Mongo::Connection.new(ServerConfig.mongodb_host, ServerConfig.mongodb_port).db(ServerConfig.mongodb_dbname)
+	if db
+		if ServerConfig.has_key?('mongodb-username') and ServerConfig.has_key?('mongodb_password')
+			db.authenticate(ServerConfig.mongodb_username, ServerConfig.mongodb_password)
+		end
+		return db
+	end
+	nil
 end
