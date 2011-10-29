@@ -31,6 +31,7 @@ require 'rubygems'
 require 'yaml'
 require 'daemons'
 require 'eventmachine'
+require 'server_config.rb'
 
 def reload!
 	load 'ircserver.rb'
@@ -40,25 +41,23 @@ def reload!
 end
 reload!
 
-class ServerConfig
-	def self.load filename
-		@yaml = YAML.load File.open(filename)
-	end
-	
-	# Shorter way to access data
-	def self.method_missing m, *args, &blck
-		super unless @yaml.has_key?(m.to_s.gsub('_', '-'))
-		raise ArgumentError, "wrong number of arguments (#{args.length} for 0)" if args.any?
-		@yaml[m.to_s.gsub('_', '-')]
-	end
-end
-
 # Load the config
 ServerConfig.load 'rbircd.conf'
 
 # Daemons.daemonize
-
 server = IRCServer.new ServerConfig.server_name
+
+# Are we db logging?
+if ServerConfig.mongodb
+	require 'mongo'
+	db = Mongo::Connection.new(ServerConfig.mongodb_host, ServerConfig.mongodb_port).db(ServerConfig.mongodb_dbname)
+	if ServerConfig.has_key?('mongodb-username') and ServerConfig.has_key?('mongodb_password')
+		db.authenticate(ServerConfig.mongodb_username, ServerConfig.mongodb_password)
+	end
+	server.set_db db
+	server.set_db_logging ServerConfig.mongodb_logging
+	server.set_require_login ServerConfig.mongodb_users_req_login
+end
 
 EventMachine::run do
 	ServerConfig.listens.each do |listener|
