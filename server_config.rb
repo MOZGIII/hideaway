@@ -1,4 +1,7 @@
-# Copyright (c) 2010 Daniel Danopia
+#!/usr/bin/env ruby
+
+# Copyright (c) 2011 Ted Kulp
+# Original rbircd - (c) 2009 Daniel Danopia
 # All rights reserved.
 # 
 # Redistribution and use in source and binary forms, with or without
@@ -25,40 +28,21 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-require 'rubygems'
-require 'eventmachine'
-require 'socket'
+require 'yaml'
 
-class LineConnection < EventMachine::Connection
-  attr_accessor :port, :ip
+class ServerConfig
+	def self.load filename
+		@yaml = YAML.load File.open(filename)
+	end
 
-  def initialize
-    super
-
-    @buffer	= ''
-    
-    @port, @ip = Socket.unpack_sockaddr_in get_peername
-    puts "Connected to #{@ip}:#{@port}"
-  end
-
-  def send_line line
-	ret = "#{line.gsub("\n", '')}\n"
-	send_data ret
-	ret
-  end
-
-  def receive_data data
-    @buffer += data
-    while @buffer.include? "\n"
-      receive_line @buffer.slice!(0, @buffer.index("\n")+1).chomp
-    end
-  end
-
-  def receive_line line
-    puts line
-  end
-
-  def unbind
-    puts "Connection closed to #{@ip}:#{@port}"
-  end
+	def self.has_key? key
+		@yaml.has_key?(key) || @yaml.has_key?(key.gsub('_', '-'))
+	end
+	
+	# Shorter way to access data
+	def self.method_missing m, *args, &blck
+		super unless @yaml.has_key?(m.to_s.gsub('_', '-'))
+		raise ArgumentError, "wrong number of arguments (#{args.length} for 0)" if args.any?
+		@yaml[m.to_s.gsub('_', '-')]
+	end
 end

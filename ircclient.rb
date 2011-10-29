@@ -26,6 +26,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 require 'lineconnection'
+require 'digest/sha1'
 
 class IRCClient < LineConnection
   attr_accessor :server
@@ -35,22 +36,27 @@ class IRCClient < LineConnection
 
     @server = server
     @server.clients << self
+
+	set_comm_inactivity_timeout 60
 		
-		@nick = '*'
-		@umodes = ''
-		
-		@protocols = []
-		@watch = []
-		@silence = []
-		
-		@created_at = Time.now
-		@modified_at = Time.now
-		
-		@port, @ip = Socket.unpack_sockaddr_in get_peername
-		@host = @ip
-		
-		send @server.name, :notice, 'AUTH', '*** Looking up your hostname...'
-		send @server.name, :notice, 'AUTH', '*** Found your hostname'
+	@nick = '*'
+	@pass = ''
+	@umodes = ''
+	@ident = ''
+	@anonymous = true
+	
+	@protocols = []
+	@watch = []
+	@silence = []
+	
+	@created_at = Time.now
+	@modified_at = Time.now
+	
+	@port, @ip = Socket.unpack_sockaddr_in get_peername
+	@host = @ip
+	
+	send @server.name, :notice, 'AUTH', '*** Looking up your hostname...'
+	send @server.name, :notice, 'AUTH', '*** Found your hostname'
   end
 
   def unbind
@@ -60,18 +66,81 @@ class IRCClient < LineConnection
   end
 
 
-  attr_reader :nick, :ident, :realname, :conn, :addr, :ip, :host, :dead, :umodes, :server
+  attr_reader :nick, :ident, :realname, :conn, :addr, :ip, :host, :dead, :umodes, :server, :pass, :anonymous
   attr_accessor :opered, :away, :created_at, :modified_at
 
 	def is_registered?
-		@nick != '*' && @ident
+		@nick != '*' && @ident != ''
 	end
+
+	def is_anonymous?
+		@anonymous
+	end
+
 	def check_registration
 		return unless is_registered?
+		if !check_authentication
+			close 'Invalid USER/PASS combination'
+		end
 		send_welcome_flood
 		change_umode '+iwx'
+		# If they're anonymous, put them into any preconfigured
+		# channels
+		if is_anonymous?
+			ServerConfig.anonymous_channels.each do |chan_name|
+				join chan_name
+			end
+		end
 	end
- 
+
+	def check_authentication
+		db = @server.get_db
+		if db
+			user = get_db_user
+			if user
+				if user['password'] == @pass
+					@anonymous = false
+					return true
+				end
+			# Make sure no one stomps on a registered username
+			elsif ServerConfig.allow_anonymous_users
+				return true
+			end
+		# No db?  There are no non-anoymous users, then
+		# Won't make much diff, they won't have privileges
+		# to stomp on anyway, since there will be no data or
+		# registered users.
+		elsif ServerConfig.allow_anonymous_users
+			return true
+		end
+		false
+	end
+
+	def get_db_user
+		user = nil
+		db = @server.get_db
+		if db
+			user = db.collection('users').find_one('username' => @ident)
+		end
+		user
+	end
+
+	def update_part_record channel_name
+		unless is_anonymous?
+			db = @server.get_db
+			if db
+				user = db.collection('users').find_one('username' => @ident)
+				if user
+					unless user['last_part']
+						user['last_part'] = Hash.new
+					end
+					user['last_part'][channel_name] = Time.now.to_i
+					db.collection('users').update({"_id" => user["_id"]}, user)
+				end
+			end
+		end
+	end
+
 	def close reason='Client quit'
 		@server.log_nick @nick, "User disconnected (#{reason})."
 		return if @dead
@@ -84,6 +153,7 @@ class IRCClient < LineConnection
 				updated_users << user
 			end
 			channel.users.delete self
+			update_part_record channel.name
 		end
 		@dead = true
 		
@@ -142,7 +212,7 @@ class IRCClient < LineConnection
 		
 		features.each_slice(13) do |slice| # Why 13? Ask freenode
 			slice.map! do |(key, value)|
-				(value == true) ? key.upcase"#{key.upcase}=#{value}"
+				(value == true) ? key.upcase : "#{key.upcase}=#{value}"
 			end
 			
 			slice << 'are supported by this server'
@@ -191,12 +261,28 @@ class IRCClient < LineConnection
 			send_numeric 422, 'MOTD File is missing'
 		end
 	end
+
+	def has_access_to? channel_name
+		# If it's in the anon list, then it's automatically true
+		return true if ServerConfig.anonymous_channels.include?(channel_name)
+
+		user = get_db_user
+		if user
+			if user['allow_channels']
+				return true if user['allow_channels'].include?('*')
+				return user['allow_channels'].include?(channel_name)
+			end
+		end
+		false
+	end
 	
 	def join target
 		channel = @server.find_channel target
 		
 		if !@server.validate_chan(target)
 			send_numeric 432, target, 'No such channel'
+		elsif !has_access_to?(target)
+			send_numeric 474, target, 'No access to this channel'
 		elsif channels.size >= ServerConfig.max_channels_per_user.to_i
 			send_numeric 405, target, 'You have joined too many channels'
 		elsif channel && channel.has_mode?('i')
@@ -204,10 +290,40 @@ class IRCClient < LineConnection
 		else
 			channel ||= @server.find_or_create_channel(target)
 			return channel if channel.users.include?(self)
-			channel.join self
+			# Anonymous user can't be op... empty room or not
+			channel.join self, !is_anonymous?
 			send_topic channel
 			send_names channel
+			if !is_anonymous?
+				send_backlog channel
+			end
 		end
+	end
+
+	def send_backlog channel
+		last_part = get_last_part channel
+		unless last_part.nil?
+			# Ok, we have when they parted -- now let's blast out the
+			# log for that channel
+			db = @server.get_db
+			if db
+				db.collection('channel-' + channel.name).find({'ident' => {'$ne' => @ident}, 'timestamp' => {'$gte' => last_part}}).sort([['timestamp', 'ascending']]).each do |row|
+					if row['type'] == 'privmsg'
+						send "#{row['nick']}!#{row['ident']}@#{@host}", :privmsg, channel.name, Time.at(row['timestamp']).strftime('%T') + "> " + row['message']
+					end
+				end
+			end
+		end
+	end
+
+	def get_last_part channel
+		user = get_db_user
+		if user
+			if user['last_part'] and user['last_part'][channel.name]
+				return user['last_part'][channel.name]
+			end
+		end
+		nil
 	end
 	
 	def send_topic channel, detailed=false
@@ -282,10 +398,10 @@ class IRCClient < LineConnection
 		end
 	end
 	
-  def receive_line line
+	def receive_line line
 		puts line if @server.debug
-  	@modified_at = Time.now
-  	
+		@modified_at = Time.now
+
 		# Parse as per the RFC
 		raw_parts = line.chomp.split ' :', 2
 		args = raw_parts.shift.split ' '
@@ -294,7 +410,7 @@ class IRCClient < LineConnection
 		command = args.shift.downcase
 		@server.log_nick @nick, command
 		
-		if !is_registered? && !['user', 'nick', 'quit', 'pong'].include?(command)
+		if !is_registered? && !['user', 'pass', 'nick', 'quit', 'pong'].include?(command)
 			send_numeric 451, command.upcase, 'You have not registered'
 			return
 		end
@@ -310,6 +426,18 @@ class IRCClient < LineConnection
 					@ident = args[0]
 					@realname = args[3]
 					check_registration
+				end
+
+			when 'pass'
+				if args.empty? || args[0].size < 1
+					send_numeric 461, 'PASS', 'Not enough parameters'
+				elsif is_registered?
+					send_numeric 462, 'You may not reregister'
+				else
+					#Throw this in a variable for now, since
+					#PASS comes before USER. We'll check it's
+					#validity after USER comes through.
+					@pass = Digest::SHA1.hexdigest(args[0])
 				end
 		
 			when 'nick'

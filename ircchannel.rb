@@ -71,13 +71,24 @@ class IRCChannel
 	
 	def message(sender, message)
 		send_to_all_except sender, sender.path, :privmsg, @name, message
+		server = sender.server
+		if server and server.is_db_logging
+			doc = {:channel => @name, :nick => sender.nick, :ident => sender.ident, :message => message, :type => 'privmsg', :timestamp => Time.new.to_i}
+			db = server.get_db.collection('channel-' + @name).insert(doc)
+		end
 	end
+
 	def notice(sender, message)
 		send_to_all_except sender, sender.path, :notice, @name, message
+		server = sender.server
+		if server and server.is_db_logging
+			doc = {:channel => @name, :nick => sender.nick, :ident => sender.ident, :message => message, :type => 'notice', :timestamp => Time.new.to_i}
+			db = server.get_db.collection('channel-' + @name).insert(doc)
+		end
 	end
 	
-	def join client
-		@ops << client if empty?
+	def join client, allow_auto_op=true
+		@ops << client if empty? and allow_auto_op
 		@users << client
 		send_to_all client.path, :join, @name
 	end
@@ -96,6 +107,7 @@ class IRCChannel
 		[@users, @owners, @protecteds, @ops, @halfops, @voices].each do |list|
 			list.delete client
 		end
+		client.update_part_record @name
 	end
 	
 	def empty?
@@ -107,6 +119,11 @@ class IRCChannel
 		@topic_timestamp = Time.now
 		@topic_author = author.nick
 		send_to_all author, :topic, @name, topic
+		server = author.server
+		if server and server.is_db_logging
+			doc = {:channel => @name, :nick => @topic_author, :ident => author.ident, :message => topic, :type => 'topic', :timestamp => @topic_timestamp.to_i}
+			db = server.get_db.collection('channel-' + @name).insert(doc)
+		end
 	end
 	
 	def has_mode? mode
